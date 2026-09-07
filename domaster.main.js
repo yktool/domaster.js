@@ -2990,17 +2990,26 @@
       return this;
     });
     extend("flip", function flip(actionFn, duration = 300) {
+      if (!isDM(this)) Illegal("flip");
+
       const len = dmLengthMap.get(this),
-        firstPositions = Array.from(this, el => el.getBoundingClientRect());
+        firstPositions = new Map;
+
+      for (let i = 0; i < len; i++) {
+        const el = this[ i ];
+        if (el) firstPositions.set(el, el.getBoundingClientRect());
+      }
 
       if (typeof actionFn === "function") {
         actionFn.call(this);
       }
 
-      for (let i = 0, el; el = this[ i ], i < len; i++) {
-        const first = firstPositions[ i ],
-          last = el.getBoundingClientRect(),
+      for (let i = 0; i < len; i++) {
+        const el = this[ i ];
+        if (!el || !firstPositions.has(el)) continue;
 
+        const first = firstPositions.get(el),
+          last = el.getBoundingClientRect(),
           deltaX = first.left - last.left,
           deltaY = first.top - last.top;
 
@@ -3013,7 +3022,7 @@
             easing: "cubic-bezier(0.4, 0, 0.2, 1)"
           });
         }
-      };
+      }
 
       return this;
     });
