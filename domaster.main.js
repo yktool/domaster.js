@@ -245,9 +245,9 @@
     };
 
     IntersectionObserver.prototype.observe = function(target) {
-      var isTargetAlreadyObserved = this._observationTargets.some(function(item) {
-        return item.element == target;
-      });
+      var isTargetAlreadyObserved = this._observationTargets.some(item =>
+        item.element == target
+      );
 
       if (isTargetAlreadyObserved) return;
 
@@ -262,9 +262,9 @@
     };
 
     IntersectionObserver.prototype.unobserve = function(target) {
-      this._observationTargets = this._observationTargets.filter(function(item) {
-        return item.element != target;
-      });
+      this._observationTargets = this._observationTargets.filter(item =>
+        item.element != target
+      );
       this._unmonitorIntersections(target.ownerDocument);
       if (this._observationTargets.length == 0) {
         this._unregisterInstance();
@@ -525,9 +525,9 @@
     };
 
     IntersectionObserver.prototype._expandRectByRootMargin = function(rect) {
-      var margins = this._rootMarginValues.map((margin, i) => {
-        return margin.unit == "px" ? margin.value : margin.value * (i % 2 ? rect.width : rect.height) / 100;
-      }),
+      var margins = this._rootMarginValues.map((margin, i) =>
+        margin.unit == "px" ? margin.value : margin.value * (i % 2 ? rect.width : rect.height) / 100
+      ),
 
         newRect = {
           top: rect.top - margins[ 0 ],
@@ -715,7 +715,7 @@
 
     if (typeof window !== "object") return;
 
-    if ("ResizeObserver" in window) {
+    if (typeof window.ResizeObserver === "function") {
       _ResizeObserver = window.ResizeObserver;
       return;
     }
@@ -855,7 +855,7 @@
 
   /* --- end polyfill --- */
 
-  var supportsEventListenerSignal = (function() {
+  var supportsEventListenerSignal = (_ => {
     let supportsSignal = false;
     try {
       const options = Object.defineProperty({}, "signal", {
@@ -1056,9 +1056,9 @@
       }
     },
 
-    downEvent = window.PointerEvent ? 'pointerdown' :
-               ('ontouchstart' in window ? 'touchstart' :
-                'mousedown'),
+    downEvent = window.PointerEvent ? "pointerdown" :
+      ("ontouchstart" in window ? "touchstart" :
+        "mousedown"),
 
     uniqueEvents = new Map([
       [ "scrollIn", (fn, target, controller, { margin, type, limit }, data) => {
@@ -1217,11 +1217,11 @@
           };
 
         if (supportsEventListenerSignal) {
-          document.addEventListener(downEvent, handler, { signal });
+          d.addEventListener(downEvent, handler, { signal });
         } else {
-          document.addEventListener(downEvent, handler);
+          d.addEventListener(downEvent, handler);
           signal.addEventListener("abort", _ => {
-            document.removeEventListener(downEvent, handler);
+            d.removeEventListener(downEvent, handler);
           }, { once: true });
         }
       } ]
@@ -1338,7 +1338,7 @@
       });
 
       const resizeObserver = data.get("resizeObserver");
-      resizeObserver && resizeObserver.disconnect();
+      if (resizeObserver) resizeObserver.disconnect();
 
       ElementMap.delete(target);
     },
@@ -1746,7 +1746,7 @@
             };
             if (options.length > 4 && uniqueEvents.has(type) && isObject(options[ 4 ])) {
               option[ options[ 0 ] ][ type ].data = options[ 4 ];
-            } else if (options.length > 3 && uniqueEvents.has(type) && isObject(options[ 3 ])) {
+            } else if (options.length > 3 && uniqueEvents.has(type)) {
               option[ options[ 0 ] ][ type ].data = options[ 3 ];
             }
           }
@@ -1947,8 +1947,8 @@
       updateDOM(stateInstance.data[ key ]);
 
       if (targetAttr === "val") {
-        this.event.on("input", "input, textarea, select", _ => {
-          stateInstance.data[ key ] = this.value;
+        this.event.on("input", "input, textarea, select", e => {
+          stateInstance.data[ key ] = e.target.value;
         });
       }
 
@@ -2222,6 +2222,51 @@
       return this;
     }
 
+    toggleAttr(attr, force) {
+      const len = dmLengthMap.get(this);
+      if (!len) return this;
+
+      if (typeof attr === 'object' && attr !== null) {
+        const keys = Object.keys(attr);
+        for (let i = 0; i < keys.length; i++) {
+          const key = keys[ i ];
+          this.toggleAttr(key, attr[ key ]);
+        }
+
+        return this;
+      }
+
+      for (let i = 0; i < len; i++) {
+        const el = this[ i ],
+          shouldAdd = force !== undefined ? !!force : !el.hasAttribute(attr);
+
+        if (shouldAdd) {
+          el.setAttribute(attr, '');
+        } else {
+          el.removeAttribute(attr);
+        }
+      }
+
+      return this;
+    }
+
+    toggleClassMap(classMap) {
+      const len = dmLengthMap.get(this);
+      if (!len || !classMap) return this;
+
+      for (let i = 0; i < len; i++) {
+        const el = this[ i ],
+          classNames = Object.keys(classMap);
+        for (let i = 0; i < classNames.length; i++) {
+          const className = classNames[ i ],
+            force = !!classMap[ className ];
+          el.classList.toggle(className, force);
+        }
+      }
+
+      return this;
+    }
+
     append(content) {
       if (!isDM(this)) Illegal("append");
       const falsy = dmFalsyMap.get(this),
@@ -2455,6 +2500,31 @@
       return this;
     }
 
+    autoResize() {
+      const len = dmLengthMap.get(this);
+      if (!len) return this;
+
+      for (let i = 0; i < len; i++) {
+        const el = this[ i ];
+        if (el.tagName !== "TEXTAREA") continue;
+
+        const adjustHeight = _ => {
+          el.style.height = "auto";
+          el.style.height = `${el.scrollHeight}px`;
+        },
+
+          data = getData(el);
+        if (data && data.has("hasAutoResize")) {
+          el.addEventListener("input", adjustHeight);
+          data.set("hasAutoResize", true);
+        }
+
+        adjustHeight();
+      }
+
+      return this;
+    }
+
     async copy(type = "text") {
       if (!isDM(this)) Illegal("copy");
       if (dmFalsyMap.get(this)) return false;
@@ -2511,6 +2581,63 @@
       }
     }
 
+    insertAtCaret(content) {
+      const len = dmLengthMap.get(this);
+      if (!len || content == null) return this;
+
+      for (let i = 0; i < len; i++) {
+        const el = this[ i ];
+
+        if (el.tagName === "TEXTAREA" || (el.tagName === "INPUT" && /^(text|search|url|tel|password)$/i.test(el.type))) {
+          el.focus();
+          const text = typeof content === "string"
+            ? content
+            : (content.textContent || ""),
+            start = el.selectionStart,
+            end = el.selectionEnd;
+
+          if (typeof el.setRangeText === "function") {
+            el.setRangeText(text, start, end, "end");
+          } else {
+            el.value = `${el.value.slice(0, start)}${text}${el.value.slice(end)}`
+            el.selectionStart = el.selectionEnd = start + text.length;
+          }
+        } else if (el.isContentEditable) {
+          el.focus();
+          const sel = window.getSelection();
+          if (!sel || !sel.rangeCount) continue;
+
+          const range = sel.getRangeAt(0);
+          range.deleteContents();
+
+          let lastNode;
+          if (typeof content === "string") {
+            const temp = d.createElement("div");
+            temp.innerHTML = content;
+            const frag = d.createDocumentFragment();
+            let child;
+            while ((child = temp.firstChild)) {
+              lastNode = child;
+              frag.appendChild(child);
+            }
+            range.insertNode(frag);
+          } else {
+            lastNode = content.nodeType ? content : content[ 0 ];
+            if (lastNode) range.insertNode(lastNode);
+          }
+
+          if (lastNode) {
+            range.setStartAfter(lastNode);
+            range.setEndAfter(lastNode);
+            sel.removeAllRanges();
+            sel.addRange(range);
+          }
+        }
+      }
+
+      return this;
+    }
+
     morph(newHTML) {
       if (!isDM(this)) Illegal("morph");
       const falsy = dmFalsyMap.get(this),
@@ -2523,6 +2650,124 @@
         const newEl = temp.content.firstElementChild;
         if (newEl) patchNode(this[ i ], newEl);
       }
+      return this;
+    }
+
+    swap(target) {
+      if (!isDM(this)) Illegal("swap");
+      if (dmFalsyMap.get(this) || !target) return this;
+
+      const targetDM = isDM(target) ? target : new DM(target);
+      if (dmFalsyMap.get(targetDM)) return this;
+
+      const count = Math.min(dmLengthMap.get(this), dmLengthMap.get(targetDM));
+
+      for (let i = 0; i < count; i++) {
+        const el1 = this[ i ],
+          el2 = targetDM[ i ];
+
+        if (!el1 || !el2 || el1 === el2) continue;
+
+        const parent1 = el1.parentNode,
+          parent2 = el2.parentNode;
+        if (!parent1 || !parent2) continue;
+
+        const sibling1 = el1.nextSibling,
+          sibling2 = el2.nextSibling;
+
+        if (sibling1 === el2) {
+          parent1.insertBefore(el2, el1);
+        } else if (sibling2 === el1) {
+          parent2.insertBefore(el1, el2);
+        } else {
+          parent2.insertBefore(el1, sibling2);
+          parent1.insertBefore(el2, sibling1);
+        }
+      }
+
+      return this;
+    }
+
+    wrap(wrapper) {
+      const len = dmLengthMap.get(this);
+      if (!len || !wrapper) return this;
+
+      for (let i = 0; i < len; i++) {
+        const el = this[ i ];
+        if (!el || !el.parentNode) continue;
+
+        let wrapNode = typeof wrapper === "string"
+          ? domaster.parse(wrapper)
+          : (i === 0
+            ? (wrapper.nodeType
+              ? wrapper
+              : wrapper[ 0 ])
+            : (wrapper.nodeType
+              ? wrapper
+              : wrapper[ 0 ]).cloneNode(true));
+
+        if (!wrapNode) continue;
+
+        let deepest = wrapNode;
+        while (deepest.firstElementChild) {
+          deepest = deepest.firstElementChild;
+        }
+
+        el.parentNode.insertBefore(wrapNode, el);
+        deepest.appendChild(el);
+      }
+      return this;
+    }
+
+    wrapAll(wrapper) {
+      const len = dmLengthMap.get(this);
+      if (!len || !wrapper) return this;
+
+      let wrapNode = typeof wrapper === "string"
+        ? domaster.parse(wrapper)
+        : (wrapper.nodeType ? wrapper : wrapper[ 0 ]);
+
+      if (!wrapNode) return this;
+
+      const firstEl = this[ 0 ];
+      if (!firstEl || !firstEl.parentNode) return this;
+      firstEl.parentNode.insertBefore(wrapNode, firstEl);
+
+      let deepest = wrapNode;
+      while (deepest.firstElementChild) {
+        deepest = deepest.firstElementChild;
+      }
+
+      for (let i = 0; i < len; i++) {
+        deepest.appendChild(this[ i ]);
+      }
+
+      return this;
+    }
+
+    unwrap() {
+      const len = dmLengthMap.get(this);
+      if (!len) return this;
+
+      const parents = new Set;
+      for (let i = 0; i < len; i++) {
+        const parent = this[ i ].parentNode;
+        if (parent && parent !== d.body && parent !== d.documentElement) {
+          parents.add(parent);
+        }
+      }
+
+      parents.forEach(parent => {
+        const grandParent = parent.parentNode;
+        if (!grandParent) return;
+
+        while (parent.firstChild) {
+          grandParent.insertBefore(parent.firstChild, parent);
+        }
+
+        new DM(parent).remove();
+      });
+
       return this;
     }
 
@@ -2645,7 +2890,7 @@
   }
 
   if (typeof Element.prototype.animate === "function") {
-    extend("fadeIn",function fadeIn(option = Default) {
+    extend("fadeIn", function fadeIn(option = Default) {
       if (!isDM(this)) Illegal("fadeIn");
       const isDef = option === Default || !isObject(option),
         len = dmLengthMap.get(this);
@@ -2695,7 +2940,7 @@
       }
       return this;
     });
-    extend("fadeOut",function fadeOut(option = Default) {
+    extend("fadeOut", function fadeOut(option = Default) {
       if (!isDM(this)) Illegal("fadeOut");
       const isDef = option === Default || !isObject(option),
         len = dmLengthMap.get(this);
@@ -2743,9 +2988,37 @@
         };
       }
       return this;
-    })
+    });
+    extend("flip", function flip(actionFn, duration = 300) {
+      const len = dmLengthMap.get(this),
+        firstPositions = Array.from(this, el => el.getBoundingClientRect());
+
+      if (typeof actionFn === "function") {
+        actionFn.call(this);
+      }
+
+      for (let i = 0, el; el = this[ i ], i < len; i++) {
+        const first = firstPositions[ i ],
+          last = el.getBoundingClientRect(),
+
+          deltaX = first.left - last.left,
+          deltaY = first.top - last.top;
+
+        if (deltaX !== 0 || deltaY !== 0) {
+          el.animate([
+            { transform: `translate(${deltaX}px, ${deltaY}px)` },
+            { transform: "translate(0, 0)" }
+          ], {
+            duration: duration,
+            easing: "cubic-bezier(0.4, 0, 0.2, 1)"
+          });
+        }
+      };
+
+      return this;
+    });
   } else {
-    extend("fadeIn",function fadeIn(option = Default) {
+    extend("fadeIn", function fadeIn(option = Default) {
       if (!isDM(this)) Illegal("fadeIn");
       const isDef = option === Default || !isObject(option),
         len = dmLengthMap.get(this);
@@ -2794,7 +3067,7 @@
       }
       return this;
     });
-    extend("fadeOut",function fadeOut(option = Default) {
+    extend("fadeOut", function fadeOut(option = Default) {
       if (!isDM(this)) Illegal("fadeOut");
       const isDef = option === Default || !isObject(option),
         len = dmLengthMap.get(this);
@@ -2841,6 +3114,44 @@
         };
         el.addEventListener("transitionend", handleTransitionEnd);
       }
+      return this;
+    });
+    extend("flip", function flip(actionFn, duration = 300) {
+      if (!isDM(this)) Illegal("flip");
+      const len = dmLengthMap.get(this),
+        firstPositions = Array.from(this, el => el.getBoundingClientRect());
+
+      if (typeof actionFn === "function") {
+        actionFn.call(this);
+      }
+
+      for (let i = 0; i < len; i++) {
+        const el = this[ i ],
+          first = firstPositions[ i ],
+          last = el.getBoundingClientRect(),
+          deltaX = first.left - last.left,
+          deltaY = first.top - last.top;
+
+        if (deltaX !== 0 || deltaY !== 0) {
+          el.style.transition = "none";
+          el.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+
+          //Trigger a reflow.
+          void el.offsetHeight;
+
+          el.style.transition = `transform ${duration}ms cubic-bezier(0.4, 0, 0.2, 1)`;
+          el.style.transform = "translate(0, 0)";
+
+          const handleTransitionEnd = e => {
+            if (e.target !== el || e.propertyName !== "transform") return;
+            el.style.transition = "";
+            el.style.transform = "";
+            el.removeEventListener("transitionend", handleTransitionEnd);
+          };
+          el.addEventListener("transitionend", handleTransitionEnd);
+        }
+      }
+
       return this;
     });
   }
